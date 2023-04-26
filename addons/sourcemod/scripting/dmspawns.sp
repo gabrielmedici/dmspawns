@@ -78,14 +78,14 @@ public Plugin myinfo =
 
 public void OnPluginStart()
 {
-	LogMessage("== Deathmatch Spawn File Creator active, v%s ==", PLUGIN_VERSION);
-	LoadTranslations("dmspawn/dmspawn_phrases");
-	AutoExecConfig(true, "dmspawn", "sourcemod/dmspawn");
+	LogMessage("== Deathmatch Spawns Active, v%s ==", PLUGIN_VERSION);
+	LoadTranslations("dmspawns/dmspawns_phrases");
+	AutoExecConfig(true, "dmspawns", "sourcemod/dmspawns");
 
 	// SDKHooks_Exists = LibraryExists("sdkhooks");
 
-	CreateConVar("dmspawn_version", PLUGIN_VERSION, "Plugin version.", FCVAR_NOTIFY);
-	cv_PluginEnabled = CreateConVar("dmspawn_enabled",
+	CreateConVar("dmspawns_version", PLUGIN_VERSION, "Plugin version.", FCVAR_NOTIFY);
+	cv_PluginEnabled = CreateConVar("dmspawns_enabled",
 									"1",
 									"Enables or disables the plugin. Changing this while in-game will restart the map.",
 									FCVAR_NOTIFY | FCVAR_ARCHIVE,
@@ -94,7 +94,7 @@ public void OnPluginStart()
 									true,
 									1.0);
 
-	cv_Resupply		 = CreateConVar("dmspawn_resupply_enabled",
+	cv_Resupply		 = CreateConVar("dmspawns_resupply_enabled",
 									"0",
 									"If 0, resupply cabinets will be disabled at the start of the map.",
 									FCVAR_NOTIFY | FCVAR_ARCHIVE,
@@ -102,7 +102,7 @@ public void OnPluginStart()
 									0.0,
 									true,
 									1.0);
-	cv_SpawnRadius	 = CreateConVar("dmspawn_spawn_radius",
+	cv_SpawnRadius	 = CreateConVar("dmspawns_spawn_radius",
 									"64",
 									"Radius around spawn point in which to destroy objects/kill clients.",
 									FCVAR_ARCHIVE,
@@ -111,7 +111,7 @@ public void OnPluginStart()
 									true,
 									128.0);
 
-	cv_TeamTriggers	 = CreateConVar("dmspawn_team_filters_enabled",
+	cv_TeamTriggers	 = CreateConVar("dmspawns_team_filters_enabled",
 									"0",
 									"If 0, team filters for spawn doors will be disabled.",
 									FCVAR_NOTIFY | FCVAR_ARCHIVE,
@@ -120,7 +120,7 @@ public void OnPluginStart()
 									true,
 									1.0);
 
-	cv_SpawnMode	 = CreateConVar("dmspawn_mode",
+	cv_SpawnMode	 = CreateConVar("dmspawns_mode",
 									"0",
 									"Spawn mode. 0 = Random spawns, 1 = Random spawn queue.",
 									FCVAR_NOTIFY | FCVAR_ARCHIVE,
@@ -136,16 +136,16 @@ public void OnPluginStart()
 	HookEventEx("player_spawn", Event_Spawn, EventHookMode_Post);
 	HookEventEx("player_team", Event_TeamsChange, EventHookMode_Post);
 
-	RegAdminCmd("dmspawn_edit", Command_Edit, ADMFLAG_CONFIG, "Enables spawn edit mode.");
-	RegAdminCmd("dmspawn_load", Command_Load, ADMFLAG_CONFIG, "Loads the spawn points from the map spawn file.");
-	RegAdminCmd("dmspawn_add", Command_Add, ADMFLAG_CONFIG, "Adds a spawn point at the player's current position.");
-	RegAdminCmd("dmspawn_remove", Command_Remove, ADMFLAG_CONFIG, "Removes the spawn point the player is standing beside.");
-	RegAdminCmd("dmspawn_finish", Command_Finish, ADMFLAG_CONFIG, "Exports the current spawn points to the spawn file and exits edit mode.");
-	RegAdminCmd("dmspawn_dump_all", Command_DumpAll, ADMFLAG_CONFIG, "Debugging command. Dumps all global variable values to the client's console.");
-	RegAdminCmd("dmspawn_regenerate_spawn_queue", Command_RegenQueue, ADMFLAG_CONFIG, "Re-generates the random queue that decides where clients will spawn.");
+	RegAdminCmd("dmspawns_edit", Command_Edit, ADMFLAG_CONFIG, "Enables spawn edit mode.");
+	RegAdminCmd("dmspawns_load", Command_Load, ADMFLAG_CONFIG, "Loads the spawn points from the map spawn file.");
+	RegAdminCmd("dmspawns_add", Command_Add, ADMFLAG_CONFIG, "Adds a spawn point at the player's current position.");
+	RegAdminCmd("dmspawns_remove", Command_Remove, ADMFLAG_CONFIG, "Removes the spawn point the player is standing beside.");
+	RegAdminCmd("dmspawns_finish", Command_Finish, ADMFLAG_CONFIG, "Exports the current spawn points to the spawn file and exits edit mode.");
+	RegAdminCmd("dmspawns_dump_all", Command_DumpAll, ADMFLAG_CONFIG, "Debugging command. Dumps all global variable values to the client's console.");
+	RegAdminCmd("dmspawns_regenerate_spawn_queue", Command_RegenQueue, ADMFLAG_CONFIG, "Re-generates the random queue that decides where clients will spawn.");
 
 #if DEBUG == 1
-	RegAdminCmd("dmspawn_find_spawns", Command_FindSpawns, ADMFLAG_CONFIG, "Finds and outputs any info_player_teamspawns.");
+	RegAdminCmd("dmspawns_find_spawns", Command_FindSpawns, ADMFLAG_CONFIG, "Finds and outputs any info_player_teamspawns.");
 #endif
 
 	if (IsServerProcessing())
@@ -182,7 +182,7 @@ public void OnMapStart()
 
 	char MapName[64];
 	GetCurrentMap(MapName, sizeof(MapName));
-	Format(FilePath, sizeof(FilePath), "scripts/dmspawn/%s_spawns.txt", MapName);
+	Format(FilePath, sizeof(FilePath), "scripts/dmspawns/%s_spawns.txt", MapName);
 
 #if DEBUG == 1
 	LogMessage("File path for map: %s", FilePath);
@@ -286,7 +286,7 @@ public Action Event_TeamsChange(Handle event, const char[] name, bool dontBroadc
 	if (client == GlobalClient)
 	{
 		// Execute the finish command.
-		ClientCommand(client, "dmspawn_finish");
+		ClientCommand(client, "dmspawns_finish");
 	}
 }
 
