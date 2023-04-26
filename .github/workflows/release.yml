@@ -34,12 +34,7 @@ jobs:
 
       - name: Install zip
         uses: montudor/action-zip@v1
-
-      - name: Zip output
-        run: |
-          zip -qq -y -r ${{ github.event.repository.name }}-${{ github.ref_name }}.zip configs plugins scripting extensions gamedata translations data
-        working-directory: ${{ env.SCRIPTS_PATH }}
-
+        
       - name: Create Release
         uses: ncipollo/release-action@v1
         env:
