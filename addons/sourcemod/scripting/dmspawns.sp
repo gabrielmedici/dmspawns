@@ -1477,11 +1477,11 @@ public Action Command_RegenQueue(int client, any args)
 
 #if DEBUG == 1
 
-public Action : Command_FindSpawns(client, args)
+public Action Command_FindSpawns(int client, any args)
 {
 	if ((g_PluginState & STATE_NO_ACTIVITY) == STATE_NO_ACTIVITY) return Plugin_Handled;
 
-	new Ent = -1;
+	int Ent = -1;
 
 	while ((Ent = FindEntityByClassname(Ent, "info_player_teamspawn")) != -1)
 	{
