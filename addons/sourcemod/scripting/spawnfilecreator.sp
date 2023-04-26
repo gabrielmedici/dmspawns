@@ -7,7 +7,9 @@
 #include <tf2>
 
 #define DEBUG 0
+
 #pragma semicolon 1
+#pragma newdecls required
 
 #define PLUGIN_NAME			  "Deathmatch Spawn File Creator"
 #define PLUGIN_AUTHOR		  "[X6] Herbius"
@@ -44,35 +46,37 @@
 #define SOUND_CANCEL_SPAWNS	  "vo/sniper_jeers01.wav"
 
 // Variable declarations:
-new g_PluginState;	  // Holds the flags for the global plugin state.
+int	   g_PluginState;	 // Holds the flags for the global plugin state.
 
-new Float : Angles[MAX_SPAWN_POINTS][3];
-new Float : Position[MAX_SPAWN_POINTS][3];
-new TeamNum[MAX_SPAWN_POINTS];
-new SpawnModelIndex[MAX_SPAWN_POINTS] = { -1, ... };
-new NumPoints;	  // Records the total number of spawn points in the file.
-new String : FilePath[128];
-new bool : b_SpawnsLoaded;
-new Timelimit;				 // Holds the server's mp_timelimit value.
-new GlobalClient = -1;		 // Holds the value of the client who is editing.
-new bool : b_IsCrouching;	 // Whether or not the above client is crouching.
+float  Angles[MAX_SPAWN_POINTS][3];
+float  Position[MAX_SPAWN_POINTS][3];
+int	   TeamNum[MAX_SPAWN_POINTS];
+int	   SpawnModelIndex[MAX_SPAWN_POINTS] = { -1, ... };
+int	   NumPoints;	 // Records the total number of spawn points in the file.
+char   FilePath[128];
+bool   b_SpawnsLoaded;
+int	   Timelimit;			 // Holds the server's mp_timelimit value.
+int	   GlobalClient = -1;	 // Holds the value of the client who is editing.
+bool   b_IsCrouching;		 // Whether or not the above client is crouching.
 // new bool:SDKHooks_Exists;					// Set to true in OnPluginStart if SDKHooks is available.
 
 // ConVars:
-new Handle : cv_PluginEnabled = INVALID_HANDLE;	   // Enables or disables the plugin. Changing this while in-game will restart the map.
-new Handle : cv_Resupply	  = INVALID_HANDLE;	   // If 0, resupply cabinets will be disabled at the start of the map.
-new Handle : cv_SpawnRadius	  = INVALID_HANDLE;	   // Radius around spawn point in which to destroy objects/kill clients.
-new Handle : cv_TeamTriggers  = INVALID_HANDLE;	   // If 0, team filters for spawn doors will be disabled.
-new Handle : cv_SpawnMode	  = INVALID_HANDLE;	   // Spawn mode. 0 = Random spawns, 1 = Random spawn queue, 2 = Spawn near players, 3 = Spawn away from players.
-public Plugin : myinfo = {
+Handle cv_PluginEnabled = INVALID_HANDLE;	 // Enables or disables the plugin. Changing this while in-game will restart the map.
+Handle cv_Resupply		= INVALID_HANDLE;	 // If 0, resupply cabinets will be disabled at the start of the map.
+Handle cv_SpawnRadius	= INVALID_HANDLE;	 // Radius around spawn point in which to destroy objects/kill clients.
+Handle cv_TeamTriggers	= INVALID_HANDLE;	 // If 0, team filters for spawn doors will be disabled.
+Handle cv_SpawnMode		= INVALID_HANDLE;	 // Spawn mode. 0 = Random spawns, 1 = Random spawn queue, 2 = Spawn near players, 3 = Spawn away from players.
+public Plugin myinfo =
+{
 	name		= PLUGIN_NAME,
 	author		= PLUGIN_AUTHOR,
 	description = PLUGIN_DESCRIPTION,
 	version		= PLUGIN_VERSION,
 	url			= "https://forums.alliedmods.net/showthread.php?p=1535887"
-}
 
-		 public OnPluginStart()
+};
+
+public void OnPluginStart()
 {
 	LogMessage("== Deathmatch Spawn File Creator active, v%s ==", PLUGIN_VERSION);
 	LoadTranslations("dmspawn/dmspawn_phrases");
@@ -80,11 +84,11 @@ public Plugin : myinfo = {
 
 	// SDKHooks_Exists = LibraryExists("sdkhooks");
 
-	CreateConVar("dmspawn_version", PLUGIN_VERSION, "Plugin version.", FCVAR_PLUGIN | FCVAR_NOTIFY);
+	CreateConVar("dmspawn_version", PLUGIN_VERSION, "Plugin version.", FCVAR_NOTIFY);
 	cv_PluginEnabled = CreateConVar("dmspawn_enabled",
 									"1",
 									"Enables or disables the plugin. Changing this while in-game will restart the map.",
-									FCVAR_PLUGIN | FCVAR_NOTIFY | FCVAR_ARCHIVE,
+									FCVAR_NOTIFY | FCVAR_ARCHIVE,
 									true,
 									0.0,
 									true,
@@ -93,7 +97,7 @@ public Plugin : myinfo = {
 	cv_Resupply		 = CreateConVar("dmspawn_resupply_enabled",
 									"0",
 									"If 0, resupply cabinets will be disabled at the start of the map.",
-									FCVAR_PLUGIN | FCVAR_NOTIFY | FCVAR_ARCHIVE,
+									FCVAR_NOTIFY | FCVAR_ARCHIVE,
 									true,
 									0.0,
 									true,
@@ -101,7 +105,7 @@ public Plugin : myinfo = {
 	cv_SpawnRadius	 = CreateConVar("dmspawn_spawn_radius",
 									"64",
 									"Radius around spawn point in which to destroy objects/kill clients.",
-									FCVAR_PLUGIN | FCVAR_ARCHIVE,
+									FCVAR_ARCHIVE,
 									true,
 									1.0,
 									true,
@@ -110,7 +114,7 @@ public Plugin : myinfo = {
 	cv_TeamTriggers	 = CreateConVar("dmspawn_team_filters_enabled",
 									"0",
 									"If 0, team filters for spawn doors will be disabled.",
-									FCVAR_PLUGIN | FCVAR_NOTIFY | FCVAR_ARCHIVE,
+									FCVAR_NOTIFY | FCVAR_ARCHIVE,
 									true,
 									0.0,
 									true,
@@ -119,7 +123,7 @@ public Plugin : myinfo = {
 	cv_SpawnMode	 = CreateConVar("dmspawn_mode",
 									"0",
 									"Spawn mode. 0 = Random spawns, 1 = Random spawn queue.",
-									FCVAR_PLUGIN | FCVAR_NOTIFY | FCVAR_ARCHIVE,
+									FCVAR_NOTIFY | FCVAR_ARCHIVE,
 									true,
 									0.0,
 									true,
@@ -157,10 +161,7 @@ public Plugin : myinfo = {
 /*	========== Begin Event Hook Functions ==========	*/
 
 /*	Checks which ConVar has changed and does the relevant things.	*/
-public CvarChange(Handle
-		   : convar, const String
-		   : oldValue[], const String
-		   : newValue[])
+public void CvarChange(Handle convar, const char[] oldValue, const char[] newValue)
 {
 	// If the enabled/disabled convar has changed, run PluginStateChanged
 	if (convar == cv_PluginEnabled) PluginEnabledStateChanged(GetConVarBool(cv_PluginEnabled));
@@ -169,7 +170,7 @@ public CvarChange(Handle
 }
 
 /*	Called on map start.	*/
-public OnMapStart()
+public void OnMapStart()
 {
 	// Clear the NO_ACTIVITY flag.
 	g_PluginState &= ~STATE_NO_ACTIVITY;
@@ -179,7 +180,7 @@ public OnMapStart()
 	// If disabled, return.
 	if ((g_PluginState & STATE_DISABLED) == STATE_DISABLED) return;
 
-	decl String : MapName[64];
+	char MapName[64];
 	GetCurrentMap(MapName, sizeof(MapName));
 	Format(FilePath, sizeof(FilePath), "scripts/dmspawn/%s_spawns.txt", MapName);
 
@@ -191,7 +192,7 @@ public OnMapStart()
 	if (!RetrieveSpawnInfo(FilePath) || NumPoints < 1) return;
 }
 
-public OnMapEnd()
+public void OnMapEnd()
 {
 	// Regardless of what state is set, clear the editing state flag.
 	g_PluginState &= ~STATE_EDIT_MODE;
@@ -203,10 +204,7 @@ public OnMapEnd()
 }
 
 /*	Called when a new round begins.	*/
-public Event_RoundStart(Handle
-				 : event, const String
-				 : name[], bool
-				 : dontBroadcast)
+public void Event_RoundStart(Handle event, const char[] name, bool dontBroadcast)
 {
 	g_PluginState &= ~STATE_NOT_IN_ROUND;
 
@@ -215,7 +213,7 @@ public Event_RoundStart(Handle
 	if (!GetConVarBool(cv_Resupply))
 	{
 		// Find any func_regenerates that currently exist and disable them.
-		new Resupply = -1;
+		int Resupply = -1;
 		while ((Resupply = FindEntityByClassname(Resupply, "func_regenerate")) != -1)
 		{
 			AcceptEntityInput(Resupply, "Disable");
@@ -226,7 +224,7 @@ public Event_RoundStart(Handle
 	}
 
 	// Find any func_respawnrooms that currently exist and kill them.
-	new n_Index = -1;
+	int n_Index = -1;
 	while ((n_Index = FindEntityByClassname(n_Index, "func_respawnroom")) != -1)
 	{
 		AcceptEntityInput(n_Index, "Kill");
@@ -281,12 +279,9 @@ public Event_RoundStart(Handle
 }
 
 /*	Called when a player changes team.	*/
-public Event_TeamsChange(Handle
-				  : event, const String
-				  : name[], bool
-				  : dontBroadcast)
+public Action Event_TeamsChange(Handle event, const char[] name, bool dontBroadcast)
 {
-	new client = GetClientOfUserId(GetEventInt(event, "userid"));
+	int client = GetClientOfUserId(GetEventInt(event, "userid"));
 
 	if (client == GlobalClient)
 	{
@@ -296,19 +291,16 @@ public Event_TeamsChange(Handle
 }
 
 /*	Called when a player spawns.	*/
-public Event_Spawn(Handle
-			: event, const String
-			: name[], bool
-			: dontBroadcast)
+public Action Event_Spawn(Handle event, const char[] name, bool dontBroadcast)
 {
 	if (g_PluginState > 0) return;
 
-	new client = GetClientOfUserId(GetEventInt(event, "userid"));
+	int client = GetClientOfUserId(GetEventInt(event, "userid"));
 
 	// Choose a random spawn index to teleport the client to.
 	if (NumPoints > 0 && client > 0 && client <= MaxClients && IsClientInGame(client))
 	{
-		new i;	  // This is the index number.
+		int i;	  // This is the index number.
 
 		switch (GetConVarInt(cv_SpawnMode))
 		{
@@ -346,13 +338,13 @@ public Event_Spawn(Handle
 		}
 
 		// Firstly, check to see if there is any client or building within the specified radius of the spawn point.
-		new Float : SpawnRadius = GetConVarFloat(cv_SpawnRadius);
+		float SpawnRadius = GetConVarFloat(cv_SpawnRadius);
 
-		for (new ClientSearch = 1; ClientSearch <= MaxClients; ClientSearch++)
+		for (int ClientSearch = 1; ClientSearch <= MaxClients; ClientSearch++)
 		{
 			if (IsClientInGame(ClientSearch))
 			{
-				new Float : ClOrigin[3];
+				float ClOrigin[3];
 				GetClientAbsOrigin(ClientSearch, ClOrigin);
 
 				// If the client is near enough:
@@ -370,11 +362,11 @@ public Event_Spawn(Handle
 			}
 		}
 
-		new BuildingSearch = -1;
+		int BuildingSearch = -1;
 		while ((BuildingSearch = FindEntityByClassname(BuildingSearch, "obj_sentrygun")) != -1)
 		{
-			new Float : EntOrigin[3],
-						BuildingTeam;
+			float EntOrigin[3];
+			int	  BuildingTeam;
 			GetEntPropVector(BuildingSearch, Prop_Send, "m_vecOrigin", EntOrigin);
 			BuildingTeam = GetEntProp(BuildingSearch, Prop_Send, "m_iTeamNum");
 
@@ -399,8 +391,8 @@ public Event_Spawn(Handle
 		BuildingSearch = -1;
 		while ((BuildingSearch = FindEntityByClassname(BuildingSearch, "obj_dispenser")) != -1)
 		{
-			new Float : EntOrigin[3],
-						BuildingTeam;
+			float EntOrigin[3];
+			int	  BuildingTeam;
 			GetEntPropVector(BuildingSearch, Prop_Send, "m_vecOrigin", EntOrigin);
 			BuildingTeam = GetEntProp(BuildingSearch, Prop_Send, "m_iTeamNum");
 
@@ -425,8 +417,9 @@ public Event_Spawn(Handle
 		BuildingSearch = -1;
 		while ((BuildingSearch = FindEntityByClassname(BuildingSearch, "obj_teleporter")) != -1)
 		{
-			new Float : EntOrigin[3],
-						BuildingTeam;
+			float EntOrigin[3];
+			int	  BuildingTeam;
+
 			GetEntPropVector(BuildingSearch, Prop_Send, "m_vecOrigin", EntOrigin);
 			BuildingTeam = GetEntProp(BuildingSearch, Prop_Send, "m_iTeamNum");
 
@@ -458,9 +451,7 @@ public Event_Spawn(Handle
 }
 
 /*	Run when checking player movement buttons.	*/
-public Action : OnPlayerRunCmd(client, &buttons, &impulse, Float
-						: vel[3], Float
-						: angles[3], &weapon)
+public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3], float angles[3], int &weapon)
 {
 	if ((g_PluginState & STATE_EDIT_MODE) != STATE_EDIT_MODE) return;
 
@@ -478,11 +469,11 @@ public Action : OnPlayerRunCmd(client, &buttons, &impulse, Float
 /*	========== Begin Custom Functions ==========	*/
 
 /*	Zeroes out all global indices.	*/
-ClearAllIndices()
+void ClearAllIndices()
 {
 	NumPoints = 0;
 
-	for (new i = 0; i < MAX_SPAWN_POINTS; i++)
+	for (int i = 0; i < MAX_SPAWN_POINTS; i++)
 	{
 		Angles[i][0]	   = 0.0;
 		Angles[i][1]	   = 0.0;
@@ -498,8 +489,7 @@ ClearAllIndices()
 }
 
 /*	Trace function to exclude tracelines from hitting the player they emerge from.	*/
-public bool : TraceRayDontHitSelf(entity, mask, any
-						   : data)
+public bool TraceRayDontHitSelf(int entity, int mask, any data)
 {
 	if (entity == data)	   // Check if the TraceRay hit the player.
 	{
@@ -511,8 +501,7 @@ public bool : TraceRayDontHitSelf(entity, mask, any
 
 /*	Sets the enabled/disabled state of the plugin and restarts the map.
 	Passing true enables, false disables.	*/
-stock PluginEnabledStateChanged(bool
-								: b_state)
+stock void PluginEnabledStateChanged(bool b_state)
 {
 	if (b_state)
 	{
@@ -527,7 +516,7 @@ stock PluginEnabledStateChanged(bool
 	if ((g_PluginState & STATE_NO_ACTIVITY) == STATE_NO_ACTIVITY) return;
 
 	// Get the current map name
-	decl String : mapname[64];
+	char mapname[64];
 	GetCurrentMap(mapname, sizeof(mapname));
 
 	LogMessage("[DMS] Plugin state changed. Restarting map (%s)...", mapname);
@@ -537,7 +526,7 @@ stock PluginEnabledStateChanged(bool
 }
 
 /*	Called when the mode ConVar is changed.	*/
-SpawnModeChanged(mode)
+void SpawnModeChanged(int mode)
 {
 	switch (mode)
 	{
@@ -559,10 +548,9 @@ SpawnModeChanged(mode)
 
 /*	Parses the spawn info file and puts the values into the global variables.
 	Returns true on success, false on failure.	*/
-bool : RetrieveSpawnInfo(String
-						 : s_FilePath[])
+bool RetrieveSpawnInfo(char[] s_FilePath)
 {
-	new Handle : kv = CreateKeyValues("spawns");
+	Handle kv = CreateKeyValues("spawns");
 
 	if (kv == INVALID_HANDLE)
 	{
@@ -584,10 +572,10 @@ bool : RetrieveSpawnInfo(String
 	}
 	else	// If there are sub-keys:
 	{
-		new Float : vAngles[3];
-		new Float : vPosition[3];
-		new Team;
-		new SwitchNum = TEAM_RED;
+		float vAngles[3];
+		float vPosition[3];
+		int	  Team;
+		int	  SwitchNum = TEAM_RED;
 
 		do
 		{
@@ -636,9 +624,9 @@ bool : RetrieveSpawnInfo(String
 
 /*	Creates a model for the spawn point at the specified array index.
 	Remember that the index is one less than the actual spawn ID.	*/
-MakeSpawnModel(array_index)
+int MakeSpawnModel(int array_index)
 {
-	new Model = CreateEntityByName("prop_dynamic");
+	int Model = CreateEntityByName("prop_dynamic");
 
 	if (Model > MaxClients)
 	{
@@ -676,7 +664,7 @@ MakeSpawnModel(array_index)
 			DispatchKeyValue(Model, "skin", "1");
 		}
 
-		decl String : Targetname[13];
+		char Targetname[13];
 		Format(Targetname, sizeof(Targetname), "spawnmodel%d", (array_index + 1));
 		DispatchKeyValue(Model, "targetname", Targetname);
 
@@ -694,20 +682,17 @@ MakeSpawnModel(array_index)
 	Passing true as the first parameter re-generates the spawn queue first, according to NumPoints.
 	If noreturn = true, the index to use is not incremented.
 	If clearall = true, the queue is cleared out and all other parameters are ignored.	*/
-SpawnQueue(bool
-		   : mode	  = false, bool
-		   : noreturn = false, bool
-		   : clearall = false)
+int SpawnQueue(bool mode = false, bool noreturn = false, bool clearall = false)
 {
-	static Queue[MAX_SPAWN_POINTS] = { -1, ... };
-	static bool : Generated		   = false;
-	static IndexToUse			   = -1;
+	static int	Queue[MAX_SPAWN_POINTS] = { -1, ... };
+	static bool Generated				= false;
+	static int	IndexToUse				= -1;
 
 	if (clearall)
 	{
 		if (Generated)
 		{
-			for (new i = 0; i < MAX_SPAWN_POINTS; i++)
+			for (int i = 0; i < MAX_SPAWN_POINTS; i++)
 			{
 				Queue[i] = -1;
 			}
@@ -742,12 +727,12 @@ SpawnQueue(bool
 
 /*	Generates a new queue and places it in the specified array.
 	Returns true on success, false on failure.	*/
-bool : GenerateSpawnQueue(Queue[], maxlength)
+bool GenerateSpawnQueue(int[] Queue, int maxlength)
 {
 	if (NumPoints < 1) return false;
 
-	decl SpawnMirror[NumPoints];
-	new TotalIndices = NumPoints;
+	int[] SpawnMirror = new int[NumPoints];
+	int TotalIndices  = NumPoints;
 
 	// We will need to make a note of the total number of spawns and put the indices into the mirror array.
 	// We will then take a random number between 0 and the total count (-1) and copy this number into the first index of the queue array.
@@ -755,20 +740,20 @@ bool : GenerateSpawnQueue(Queue[], maxlength)
 	// The process will be repeated with a new random number between 1 and the new total count (-1), until the list is depleted.
 
 	// Apparently we can't do this on declaration (FFFUUU-), so it has to happen here.
-	for (new i = 0; i < NumPoints; i++)
+	for (int i = 0; i < NumPoints; i++)
 	{
 		SpawnMirror[i] = i;
 	}
 
-	for (new i = 0; TotalIndices > 0; i++)
+	for (int i = 0; TotalIndices > 0; i++)
 	{
-		new Pass = GetRandomInt(0, (TotalIndices - 1));
+		int Pass = GetRandomInt(0, (TotalIndices - 1));
 
 		// Stick the value in the queue.
 		if ((i + 1) <= maxlength) Queue[i] = SpawnMirror[Pass];
 
 		// Shift the rest of the array down.
-		for (new shift = (Pass + 1); shift < TotalIndices; shift++)
+		for (int shift = (Pass + 1); shift < TotalIndices; shift++)
 		{
 			// Each time, shift will point to the information in the next index on.
 			// Move this information to the index (shift - 1).
@@ -789,16 +774,14 @@ bool : GenerateSpawnQueue(Queue[], maxlength)
 	If reset = true, the excluded spawn will be reset and no calculation will take place.
 	I'd imagine, due to for-loop Inception, this might end up being quite expensive and so should only be
 	called when needed.	*/
-SpawnDistIndex(bool
-			   : mode  = true, bool
-			   : reset = false)
+int SpawnDistIndex(bool mode = true, bool reset = false)
 {
-	static Exclude		= -1;
+	static int Exclude		= -1;
 
-	new Float : MaxDist = 0.0;
-	new Float : MinDist = 0.0;
-	new MaxDistSpawn	= -1;
-	new MinDistSpawn	= -1;
+	float	   MaxDist		= 0.0;
+	float	   MinDist		= 0.0;
+	int		   MaxDistSpawn = -1;
+	int		   MinDistSpawn = -1;
 
 	if (reset)
 	{
@@ -807,18 +790,18 @@ SpawnDistIndex(bool
 	}
 
 	// Look through each spawn.
-	for (new i = 0; i < NumPoints; i++)
+	for (int i = 0; i < NumPoints; i++)
 	{
 		if (i != Exclude)
 		{
-			new Float : Distance;
+			float Distance;
 
 			// Check each client (on Red or Blue) and find the distance to them.
-			for (new client = 1; client <= MaxClients; client++)
+			for (int client = 1; client <= MaxClients; client++)
 			{
 				if (IsClientInGame(client) && IsPlayerAlive(client) && (GetClientTeam(client) == TEAM_RED || GetClientTeam(client) == TEAM_BLUE))
 				{
-					new Float : vClientOrigin[3];
+					float vClientOrigin[3];
 					GetClientAbsOrigin(client, vClientOrigin);
 
 					Distance += GetVectorDistance(Position[i], vClientOrigin);
@@ -892,7 +875,7 @@ SpawnDistIndex(bool
 /*	========== Begin Commands ==========	*/
 
 /*	Enters edit mode.	*/
-public Action : Command_Edit(client, args)
+public Action Command_Edit(int client, any args)
 {
 	if ((g_PluginState & STATE_NO_ACTIVITY) == STATE_NO_ACTIVITY || (g_PluginState & STATE_NOT_IN_ROUND) == STATE_NOT_IN_ROUND) return Plugin_Handled;
 
@@ -918,11 +901,11 @@ public Action : Command_Edit(client, args)
 	g_PluginState |= STATE_NOT_IN_ROUND;
 
 	// Store the current mp_timelimit value.
-	new Handle : cvTimelimit = FindConVar("mp_timelimit");
-	Timelimit				 = GetConVarInt(cvTimelimit);
+	Handle cvTimelimit = FindConVar("mp_timelimit");
+	Timelimit		   = GetConVarInt(cvTimelimit);
 
 	// Pause the timer.
-	new RoundTimer			 = FindEntityByClassname(-1, "team_round_timer");
+	int RoundTimer	   = FindEntityByClassname(-1, "team_round_timer");
 	if (RoundTimer != -1)
 	{
 		AcceptEntityInput(RoundTimer, "Pause");
@@ -940,7 +923,7 @@ public Action : Command_Edit(client, args)
 }
 
 /*	Loads spawn points from the map spawn file.	*/
-public Action : Command_Load(client, args)
+public Action Command_Load(int client, any args)
 {
 	if ((g_PluginState & STATE_NO_ACTIVITY) == STATE_NO_ACTIVITY) return Plugin_Handled;
 
@@ -970,7 +953,7 @@ public Action : Command_Load(client, args)
 
 	if (!RetrieveSpawnInfo(FilePath))
 	{
-		decl String : CurrentMapName[64];
+		char CurrentMapName[64];
 		GetCurrentMap(CurrentMapName, sizeof(CurrentMapName));
 		PrintToChat(client, "%t %s.", "dms_no_spawns_found", CurrentMapName);
 		b_SpawnsLoaded = true;
@@ -980,9 +963,9 @@ public Action : Command_Load(client, args)
 
 	// Spawns have been loaded; go through each one and create a model at the co-ordinates.
 
-	for (new i = 0; i < NumPoints; i++)
+	for (int i = 0; i < NumPoints; i++)
 	{
-		new Model		   = MakeSpawnModel(i);
+		int Model		   = MakeSpawnModel(i);
 		SpawnModelIndex[i] = Model;
 
 		if (Model > MaxClients)
@@ -990,7 +973,7 @@ public Action : Command_Load(client, args)
 			TeleportEntity(Model, Position[i], Angles[i], NULL_VECTOR);
 
 			// taunt02 or taunt06 work well.
-			new RandomTaunt = GetRandomInt(0, 1);
+			int RandomTaunt = GetRandomInt(0, 1);
 			if (RandomTaunt < 1) SetVariantString("taunt02");
 			else SetVariantString("taunt06");
 
@@ -1006,7 +989,7 @@ public Action : Command_Load(client, args)
 }
 
 /*	Adds a new spawn point where the client is standing.	*/
-public Action : Command_Add(client, args)
+public Action Command_Add(int client, any args)
 {
 	if ((g_PluginState & STATE_NO_ACTIVITY) == STATE_NO_ACTIVITY) return Plugin_Handled;
 
@@ -1052,8 +1035,7 @@ public Action : Command_Add(client, args)
 	}
 
 	// Spawns are loaded, get the client's current position and angles.
-	new Float : ClientPos[3],
-				Float : ClientAng[3];
+	float ClientPos[3], ClientAng[3];
 
 	GetClientAbsOrigin(client, ClientPos);
 	GetClientAbsAngles(client, ClientAng);
@@ -1069,7 +1051,7 @@ public Action : Command_Add(client, args)
 		return Plugin_Handled;
 	}
 
-	new String : Buffer[8];
+	char Buffer[8];
 	GetCmdArg(1, Buffer, sizeof(Buffer));
 
 	if (StrEqual(Buffer, "red", false))
@@ -1084,14 +1066,14 @@ public Action : Command_Add(client, args)
 	Angles[NumPoints]	= ClientAng;
 	Position[NumPoints] = ClientPos;
 
-	new nModelIndex		= MakeSpawnModel(NumPoints);
+	int nModelIndex		= MakeSpawnModel(NumPoints);
 	if (nModelIndex > MaxClients)
 	{
 		SpawnModelIndex[NumPoints] = nModelIndex;
 		TeleportEntity(nModelIndex, Position[NumPoints], Angles[NumPoints], NULL_VECTOR);
 
 		// taunt02 or taunt06 work well.
-		new RandomTaunt = GetRandomInt(0, 1);
+		int RandomTaunt = GetRandomInt(0, 1);
 		if (RandomTaunt < 1) SetVariantString("taunt02");
 		else SetVariantString("taunt06");
 
@@ -1102,7 +1084,7 @@ public Action : Command_Add(client, args)
 
 	NumPoints++;
 
-	new sound = GetRandomInt(1, 4);
+	int sound = GetRandomInt(1, 4);
 
 	switch (sound)
 	{
@@ -1131,7 +1113,7 @@ public Action : Command_Add(client, args)
 }
 
 /*	Removes the spawn point the client is nearest.	*/
-public Action : Command_Remove(client, args)
+public Action Command_Remove(int client, any args)
 {
 	if ((g_PluginState & STATE_NO_ACTIVITY) == STATE_NO_ACTIVITY) return Plugin_Handled;
 
@@ -1172,13 +1154,13 @@ public Action : Command_Remove(client, args)
 
 	if (GetCmdArgs() > 0)
 	{
-		new String : ArgBuffer[16];
+		char ArgBuffer[16];
 		GetCmdArg(1, ArgBuffer, sizeof(ArgBuffer));
 
 		// If the command argument is "all", get rid of everything.
 		if (StrEqual(ArgBuffer, "all", false))
 		{
-			for (new i = 0; i < NumPoints; i++)
+			for (int i = 0; i < NumPoints; i++)
 			{
 				if (IsValidEntity(SpawnModelIndex[i])) AcceptEntityInput(SpawnModelIndex[i], "Kill");
 				// if ( IsValidEntity(Index[i]) ) AcceptEntityInput(Index[i], "Kill");
@@ -1198,7 +1180,7 @@ public Action : Command_Remove(client, args)
 
 			NumPoints = 0;
 
-			new sound = GetRandomInt(1, 4);
+			int sound = GetRandomInt(1, 4);
 			switch (sound)
 			{
 				case 1:
@@ -1228,13 +1210,12 @@ public Action : Command_Remove(client, args)
 	}
 
 	// Look through all the model indices
-	new SpawnIndex = -1;
-	for (new i = 0; i < NumPoints; i++)
+	int SpawnIndex = -1;
+	for (int i = 0; i < NumPoints; i++)
 	{
 		if (IsValidEntity(SpawnModelIndex[i]))
 		{
-			new Float : ModelPos[3],
-						Float : ClientPos[3];
+			float ModelPos[3], ClientPos[3];
 			GetEntPropVector(SpawnModelIndex[i], Prop_Send, "m_vecOrigin", ModelPos);
 			GetClientAbsOrigin(client, ClientPos);
 
@@ -1257,7 +1238,7 @@ public Action : Command_Remove(client, args)
 	// if ( IsValidEntity(Index[SpawnIndex]) ) AcceptEntityInput(Index[SpawnIndex], "Kill");
 
 	// Shift all the information down in the arrays.
-	for (new shift = (SpawnIndex + 1); shift < NumPoints; shift++)
+	for (int shift = (SpawnIndex + 1); shift < NumPoints; shift++)
 	{
 		// Each time, shift will point to the information in the next index on.
 		// Move this information to the index (shift - 1).
@@ -1289,7 +1270,7 @@ public Action : Command_Remove(client, args)
 
 	NumPoints--;	// Decrement NumPoints now we've lost a spawn.
 
-	new sound = GetRandomInt(1, 4);
+	int sound = GetRandomInt(1, 4);
 	switch (sound)
 	{
 		case 1:
@@ -1319,7 +1300,7 @@ public Action : Command_Remove(client, args)
 
 /*	Exports the current spawn points to the map file.
 	Passing "cancel" ignores saving the points to the file.	*/
-public Action : Command_Finish(client, args)
+public Action Command_Finish(int client, any args)
 {
 	if ((g_PluginState & STATE_NO_ACTIVITY) == STATE_NO_ACTIVITY) return Plugin_Handled;
 
@@ -1352,33 +1333,33 @@ public Action : Command_Finish(client, args)
 		ShowActivity2(client, "[DMS]", "%t", "dms_no_spawns_loaded");
 	}
 
-	new String : ArgBuffer[16];
+	char ArgBuffer[16];
 
 	if (GetCmdArgs() > 0) GetCmdArg(1, ArgBuffer, sizeof(ArgBuffer));
 
-	new bool : b_Cancel;
+	bool b_Cancel;
 	if (StrEqual(ArgBuffer, "cancel", false)) b_Cancel = true;
 
 	if (!b_Cancel && b_SpawnsLoaded)
 	{
-		new Handle : kv = CreateKeyValues("spawns");
+		Handle kv = CreateKeyValues("spawns");
 
 		if (kv != INVALID_HANDLE)
 		{
 			// Add to the keyvalues tree.
-			for (new i = 0; i < NumPoints; i++)
+			for (int i = 0; i < NumPoints; i++)
 			{
-				decl String : Buffer[64];
+				char Buffer[64];
 				IntToString(i, Buffer, sizeof(Buffer));
 				KvJumpToKey(kv, Buffer, true);	  // This will create the new section named as whatever number i currently is.
 
-				new Float : KvVector[3];
+				float KvVector[3];
 				KvVector[0] = Angles[i][0];
 				KvVector[1] = Angles[i][1];
 				KvVector[2] = Angles[i][2];
 				KvSetVector(kv, "angles", KvVector);	// This will create a new vector with this value.
 
-				new KvTeamNum = TeamNum[i];
+				int KvTeamNum = TeamNum[i];
 				KvSetNum(kv, "TeamNum", KvTeamNum);	   // And so on.
 
 				KvVector[0] = Position[i][0];
@@ -1410,7 +1391,7 @@ public Action : Command_Finish(client, args)
 	}
 
 	// Get rid of all of our spawn models.
-	for (new i = 0; i < NumPoints; i++)
+	for (int i = 0; i < NumPoints; i++)
 	{
 		if (IsValidEntity(SpawnModelIndex[i]))
 		{
@@ -1427,7 +1408,7 @@ public Action : Command_Finish(client, args)
 
 	ServerCommand("mp_timelimit %d", Timelimit);
 
-	new RoundTimer = FindEntityByClassname(-1, "team_round_timer");
+	int RoundTimer = FindEntityByClassname(-1, "team_round_timer");
 	if (RoundTimer != -1)
 	{
 		AcceptEntityInput(RoundTimer, "Enable");
@@ -1441,7 +1422,7 @@ public Action : Command_Finish(client, args)
 	// NOTE: If the client has created new spawns but cancels, the spawns stick around.
 	// For the moment we'll restart the map when coming out of edit mode, but there could be a better solution.
 
-	decl String : CurrentMapName[64];
+	char CurrentMapName[64];
 	GetCurrentMap(CurrentMapName, sizeof(CurrentMapName));
 
 	ServerCommand("changelevel", CurrentMapName);
@@ -1450,13 +1431,13 @@ public Action : Command_Finish(client, args)
 }
 
 /*	Dumps all info from global variables to the client's console.	*/
-public Action : Command_DumpAll(client, args)
+public Action Command_DumpAll(int client, any args)
 {
 	if ((g_PluginState & STATE_NO_ACTIVITY) == STATE_NO_ACTIVITY) return Plugin_Handled;
 
 	PrintToConsole(client, "Numpoints: %d", NumPoints);
 
-	for (new i = 0; i < MAX_SPAWN_POINTS; i++)
+	for (int i = 0; i < MAX_SPAWN_POINTS; i++)
 	{
 		PrintToConsole(client, "Info at index %d:", i);
 
@@ -1470,7 +1451,7 @@ public Action : Command_DumpAll(client, args)
 }
 
 /*	Regenerates the spawn queue.	*/
-public Action : Command_RegenQueue(client, args)
+public Action Command_RegenQueue(int client, any args)
 {
 	if ((g_PluginState & STATE_NO_ACTIVITY) == STATE_NO_ACTIVITY) return Plugin_Handled;
 
@@ -1486,7 +1467,7 @@ public Action : Command_RegenQueue(client, args)
 		return Plugin_Handled;
 	}
 
-	new Success = SpawnQueue(true, true);
+	int Success = SpawnQueue(true, true);
 
 	if (Success < 0) ShowActivity2(client, "[DMS]", "%t", "dms_queue_regen_failed");
 	else ShowActivity2(client, "[DMS]", "%t %d", "dms_queue_regen_succeeded", Success);
