@@ -11,10 +11,10 @@
 #pragma semicolon 1
 #pragma newdecls required
 
-#define PLUGIN_NAME			  "Deathmatch Spawn File Creator"
-#define PLUGIN_AUTHOR		  "[X6] Herbius"
+#define PLUGIN_NAME			  "Deathmatch Spawns"
+#define PLUGIN_AUTHOR		  "[X6] Herbius & Gabriel Medici"
 #define PLUGIN_DESCRIPTION	  "Creates and handles custom deathmatch spawns for Team Fortress 2."
-#define PLUGIN_VERSION		  "1.1.0.1"
+#define PLUGIN_VERSION		  "1.1.1"
 
 #define MAX_SPAWN_POINTS	  64
 
